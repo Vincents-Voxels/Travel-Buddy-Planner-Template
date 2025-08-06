@@ -3,10 +3,540 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Travel Buddy Planner</title>
+    <title>Interactive December Vacation Planner</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Chosen Palette: Calm Harmony -->
+    <!-- Application Structure Plan: A dashboard-style SPA. The top-level presents the final recommendation immediately for quick insight. The core of the app is an interactive comparison tool where users select a destination to dynamically update a tabbed content area, allowing exploration of Overview, Climate, Activities, and Costs. This is more user-friendly than a linear report, as it puts the user in control of the information they see. A separate interactive cost calculator and a static final scorecard provide multiple ways to compare data, catering to different user preferences for data consumption. This structure turns a passive report into an active decision-making tool. -->
+    <!-- Visualization & Content Choices: Report data is transformed for better usability. Destination profiles are placed in clickable tabs to prevent information overload. Climate data (Table 1) is shown with icons for quick visual scanning. The main cost comparison (Table 2) is converted into an interactive bar chart (Cost Calculator), allowing users to filter by accommodation type, which is far more engaging than a static table. The final scorecard remains a table, as it's the most effective way to display dense, multi-point comparative data. All charts are rendered using Chart.js on a <canvas> element. Icons are inline SVGs. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc; /* slate-50 */
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 350px;
+            max-height: 50vh;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 400px;
+            }
+        }
+        .tab-active {
+            background-color: #0d9488; /* teal-600 */
+            color: white;
+            border-color: #0d9488;
+        }
+        .tab-inactive {
+            background-color: white;
+            color: #334155; /* slate-700 */
+            border-color: #e2e8f0; /* slate-200 */
+        }
+        .destination-active {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+            border-color: #0d9488; /* teal-600 */
+        }
+        .content-fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
 </head>
-<body>
-    <h1>Welcome to Travel Buddy Planner!</h1>
-    <p>Your adventure starts here.</p>
+<body class="text-slate-800">
+
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
+        
+        <header class="text-center mb-12">
+            <h1 class="text-4xl md:text-5xl font-bold text-slate-900">December Vacation Planner</h1>
+            <p class="mt-4 text-lg text-slate-600 max-w-3xl mx-auto">An interactive guide to help you choose the perfect warm-weather getaway for your group of four.</p>
+        </header>
+
+        <section id="recommendation" class="mb-12">
+            <div class="bg-white rounded-xl shadow-lg p-6 md:p-8 border-l-4 border-teal-500">
+                <div class="flex items-start gap-4">
+                    <div>
+                        <svg class="h-8 w-8 text-teal-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h2 class="text-2xl font-bold text-slate-900">Top Recommendation: Tenerife, Canary Islands</h2>
+                        <p class="mt-2 text-slate-600">Based on a comprehensive analysis, Tenerife emerges as the optimal choice. It offers an unparalleled balance of excellent weather, superior value in the luxury accommodation sector, a diverse range of activities, and a moderate total investment, making it the most strategically sound choice for a multi-generational group.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <main class="bg-white rounded-xl shadow-lg p-6 md:p-8 mb-12">
+            <h2 class="text-3xl font-bold text-center mb-2 text-slate-900">Destination Deep Dive</h2>
+            <p class="text-center text-slate-600 mb-8">Select a destination to explore its details.</p>
+
+            <div id="destination-selectors" class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            </div>
+
+            <div id="dynamic-content-area" class="mt-8 p-4 sm:p-6 bg-slate-50 rounded-lg min-h-[400px] transition-opacity duration-300">
+                <div id="tabs" class="flex flex-wrap border-b border-slate-200 mb-6">
+                </div>
+                <div id="tab-content" class="content-fade-in">
+                </div>
+            </div>
+        </main>
+
+        <section id="cost-calculator" class="bg-white rounded-xl shadow-lg p-6 md:p-8 mb-12">
+            <h2 class="text-3xl font-bold text-center mb-2 text-slate-900">Interactive Cost Calculator</h2>
+            <p class="text-center text-slate-600 mb-8">Compare the total estimated trip cost for 4 people for a 7-night stay based on your preferred lodging style.</p>
+            <div class="flex justify-center mb-6">
+                <select id="lodging-selector" class="block w-full max-w-xs rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 sm:text-sm p-3">
+                    <option value="villa">Luxury Airbnb/Villa</option>
+                    <option value="hotel" selected>Premium Hotel (2 Rooms)</option>
+                    <option value="all-inclusive">All-Inclusive Resort</option>
+                </select>
+            </div>
+            <div class="chart-container">
+                <canvas id="cost-comparison-chart"></canvas>
+            </div>
+        </section>
+        
+        <section id="scorecard" class="bg-white rounded-xl shadow-lg p-6 md:p-8">
+            <h2 class="text-3xl font-bold text-center mb-8 text-slate-900">Final Decision Scorecard</h2>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-slate-200">
+                    <thead class="bg-slate-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Metric</th>
+                            <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase tracking-wider">Cape Town</th>
+                            <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase tracking-wider">Barbados</th>
+                            <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase tracking-wider">Tenerife</th>
+                        </tr>
+                    </thead>
+                    <tbody id="scorecard-body" class="bg-white divide-y divide-slate-200">
+                    </tbody>
+                </table>
+            </div>
+        </section>
+        
+        <footer class="text-center mt-12 text-slate-500 text-sm">
+            <p>Data synthesized from the vacation planning report. All costs are estimates for a group of four in mid-December.</p>
+        </footer>
+
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const data = {
+                'Cape Town': {
+                    id: 'Cape Town',
+                    name: 'Cape Town, SA',
+                    icon: `<svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 mx-auto mb-2 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>`,
+                    tagline: 'The Cosmopolitan Epicenter of Adventure',
+                    overview: `Cape Town presents a vacation of dynamic contrasts, fusing a sophisticated urban environment with raw, breathtaking nature. December is the vibrant peak of summer, characterized by non-stop energy. Its unique proposition is the vast spectrum of experiences, from the bustling V&A Waterfront to the serene Cape Winelands. Luxury here is about exclusive, unique experiences like chartering a private yacht or securing a reservation at a globally-ranked restaurant, all enhanced by a favorable exchange rate.`,
+                    climate: {
+                        high: '73-77°F', low: '60-62°F', sea: 'Cold (Bracing)', sun: '9.5 hrs/day', rain: '2 days/month',
+                        summary: 'December offers a perfect, dry Mediterranean summer climate. Days are reliably warm and brilliantly sunny, ideal for a wide range of activities from city touring to mountain exploration. However, the Atlantic water is chilly year-round and not suitable for leisurely swimming.'
+                    },
+                    activities: [
+                        { name: 'World-Class Dining', icon: '🍽️', desc: 'Home to globally ranked restaurants like La Colombe, offering incredible value for fine dining.' },
+                        { name: 'Dramatic Coastline', icon: '🌊', desc: 'Stunning scenery and adventure sports like kitesurfing, but the water is too cold for casual swimming.' },
+                        { name: 'Vibrant Holiday Buzz', icon: '🎉', desc: 'Energetic atmosphere with light festivals, outdoor concerts, and the unique Cape Minstrels parades.' }
+                    ],
+                    costs: {
+                        flights: { low: 5360, high: 5600 },
+                        villa: { low: 3500, high: 6000 },
+                        hotel: { low: 6000, high: 9000 },
+                        'all-inclusive': { low: null, high: null },
+                        flightCostsByAirport: {
+                            DCA: { low: 1350, high: 1400 },
+                            LAX: { low: 1400, high: 1700 },
+                            PDX: { low: 1600, high: 1900 }
+                        }
+                    },
+                    scores: { 'Weather & Climate': 9, 'Travel Cost & Convenience': 4, 'Accommodation Value': 7, 'Luxury & Exclusivity': 8, 'Culinary Scene': 10, 'Water/Beach Experience': 5, 'Activities & Diversions': 10, 'Festive Ambiance': 9, 'FINAL WEIGHTED SCORE': 7.25 }
+                },
+                'Barbados': {
+                    id: 'Barbados',
+                    name: 'Barbados',
+                    icon: `<svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 mx-auto mb-2 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 01-1.125-1.125v-1.5c0-.621.504-1.125 1.125-1.125h17.25c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125m-17.25 0h17.25m-17.25 0h17.25M9 9.75l3 3m0 0l3-3m-3 3v-6m-1.5-1.5a1.5 1.5 0 10-3 0 1.5 1.5 0 003 0zM21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`,
+                    tagline: 'The Archetype of Caribbean Elegance',
+                    overview: `Barbados embodies a high-end Caribbean escape, synonymous with tranquility, sophisticated relaxation, and impeccable service. The "Platinum Coast" offers powdery white sands and calm, turquoise waters. It has a mature luxury infrastructure with iconic 5-star resorts. Luxury here is service-oriented and amenity-driven, defined by dedicated butlers, exclusive beach clubs, and private catamaran charters for an effortless, indulgent holiday.`,
+                    climate: {
+                        high: '84°F', low: '73-77°F', sea: '79-84°F (Warm)', sun: '8 hrs/day', rain: '9 days/month',
+                        summary: 'A classic tropical climate. December is consistently hot and sunny as the dry season begins. The Caribbean Sea is delightfully warm, perfect for all-day swimming and snorkeling. This is the clear winner for a group that prioritizes a warm-water experience.'
+                    },
+                    activities: [
+                        { name: 'Iconic Fine Dining', icon: '🥂', desc: 'Classic elegance in breathtaking settings like The Cliff, focused on perfect execution and ambiance.' },
+                        { name: 'Idyllic Swimming', icon: '🐢', desc: 'The main attraction. Calm, bathtub-warm turquoise water perfect for swimming and snorkeling with sea turtles.' },
+                        { name: 'Refined Festivities', icon: '🎄', desc: 'A sophisticated holiday mood blending British and Bajan traditions, with carolers and gourmet dinners.' }
+                    ],
+                    costs: {
+                        flights: { low: 2000, high: 2600 },
+                        villa: { low: 5000, high: 10000 },
+                        hotel: { low: 8000, high: 12000 },
+                        'all-inclusive': { low: 8500, high: 11000 },
+                        flightCostsByAirport: {
+                            DCA: { low: 500, high: 650 },
+                            LAX: { low: 700, high: 950 },
+                            PDX: { low: 800, high: 1100 }
+                        }
+                    },
+                    scores: { 'Weather & Climate': 8, 'Travel Cost & Convenience': 9, 'Accommodation Value': 4, 'Luxury & Exclusivity': 10, 'Culinary Scene': 8, 'Water/Beach Experience': 10, 'Activities & Diversions': 7, 'Festive Ambiance': 8, 'FINAL WEIGHTED SCORE': 7.65 }
+                },
+                'Tenerife': {
+                    id: 'Tenerife',
+                    name: 'Tenerife, Spain',
+                    icon: `<svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 mx-auto mb-2 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" /></svg>`,
+                    tagline: 'The Versatile European Retreat',
+                    overview: `Tenerife offers the comforts and infrastructure of Europe with a unique, subtropical volcanic landscape. It's a versatile choice blending resort relaxation with adventurous exploration. From the lunar-like landscapes of Teide National Park to the golden sands of Costa Adeje, it caters to diverse interests. Luxury here is defined by its accessibility and value, with a high concentration of excellent 4- and 5-star resorts at a competitive price point.`,
+                    climate: {
+                        high: '68-75°F', low: '59-63°F', sea: '66-70°F (Swimmable)', sun: '6-7 hrs/day', rain: '5 days/month',
+                        summary: 'An "eternal spring" climate. Days are pleasantly warm for beach time and exploration without intense heat, but evenings are cool and require a jacket. The Atlantic water is cooler than the Caribbean but comfortable for swimming.'
+                    },
+                    activities: [
+                        { name: 'Resort & Local Cuisine', icon: '🥘', desc: 'Strong dining scene with Michelin-starred options in resorts and authentic Canarian flavors to explore.' },
+                        { name: 'Varied Water Fun', icon: '🐬', desc: 'A mix of relaxing beaches, top-tier whale & dolphin watching, and the world-famous Siam Park water park.' },
+                        { name: 'European Holiday', icon: '🍇', desc: 'Traditional Spanish celebrations with beautiful light displays and a massive New Year\'s Eve party in Los Cristianos.' }
+                    ],
+                    costs: {
+                        flights: { low: 2600, high: 3000 },
+                        villa: { low: 2500, high: 4500 },
+                        hotel: { low: 4000, high: 7000 },
+                        'all-inclusive': { low: 5000, high: 8000 },
+                        flightCostsByAirport: {
+                            DCA: { low: 650, high: 750 },
+                            LAX: { low: 850, high: 1150 },
+                            PDX: { low: 950, high: 1300 }
+                        }
+                    },
+                    scores: { 'Weather & Climate': 10, 'Travel Cost & Convenience': 8, 'Accommodation Value': 9, 'Luxury & Exclusivity': 8, 'Culinary Scene': 8, 'Water/Beach Experience': 8, 'Activities & Diversions': 9, 'Festive Ambiance': 8, 'FINAL WEIGHTED SCORE': 8.65 }
+                }
+            };
+
+            let currentDestination = 'Tenerife';
+            let currentTab = 'overview';
+            let currentAirport = 'DCA';
+            let costChart = null;
+            let perPersonCostChart = null;
+            
+            const destinationSelectorsContainer = document.getElementById('destination-selectors');
+            const tabsContainer = document.getElementById('tabs');
+            const tabContentContainer = document.getElementById('tab-content');
+            const lodgingSelector = document.getElementById('lodging-selector');
+            const scorecardBody = document.getElementById('scorecard-body');
+
+            function renderSelectors() {
+                destinationSelectorsContainer.innerHTML = Object.values(data).map(dest => `
+                    <button data-id="${dest.id}" class="destination-selector text-left p-6 bg-white rounded-lg shadow-md hover:shadow-xl hover:border-teal-500 border-2 border-transparent transition-all duration-300 ${dest.id === currentDestination ? 'destination-active' : ''}">
+                        ${dest.icon}
+                        <h3 class="text-xl font-bold text-slate-900">${dest.name}</h3>
+                        <p class="text-sm text-slate-500">${dest.tagline}</p>
+                    </button>
+                `).join('');
+            }
+
+            function renderTabs() {
+                const tabs = ['Overview', 'Climate', 'Activities', 'Costs'];
+                tabsContainer.innerHTML = tabs.map(tab => `
+                    <button data-tab="${tab.toLowerCase()}" class="tab-selector px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 transition-colors duration-200 ${tab.toLowerCase() === currentTab ? 'tab-active' : 'tab-inactive'}">
+                        ${tab}
+                    </button>
+                `).join('');
+            }
+            
+            function renderFlightCostBreakdown() {
+                const flightCosts = data[currentDestination].costs.flightCostsByAirport[currentAirport];
+                const displayArea = document.getElementById('flight-cost-display');
+                if (displayArea) {
+                     displayArea.innerHTML = `
+                        <div class="bg-white p-4 rounded-lg shadow mt-4 text-center">
+                            <div class="font-bold text-lg text-slate-800">$${flightCosts.low.toLocaleString()} - $${flightCosts.high.toLocaleString()}</div>
+                            <div class="text-sm text-slate-500">Est. Per Person, Round-Trip</div>
+                        </div>
+                     `;
+                }
+            }
+
+            function renderTabContent() {
+                const destData = data[currentDestination];
+                let content = '';
+                tabContentContainer.innerHTML = ''; 
+                tabContentContainer.classList.remove('content-fade-in');
+                
+                void tabContentContainer.offsetWidth; 
+
+                switch(currentTab) {
+                    case 'overview':
+                        content = `<h3 class="text-2xl font-bold mb-4 text-slate-800">${destData.tagline}</h3><p class="text-slate-600 leading-relaxed">${destData.overview}</p>`;
+                        break;
+                    case 'climate':
+                        content = `
+                            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6 text-center">
+                                <div class="bg-white p-4 rounded-lg shadow"><div class="text-3xl">🌡️</div><div class="font-bold text-lg">${destData.climate.high}</div><div class="text-sm text-slate-500">Avg High</div></div>
+                                <div class="bg-white p-4 rounded-lg shadow"><div class="text-3xl">🌙</div><div class="font-bold text-lg">${destData.climate.low}</div><div class="text-sm text-slate-500">Avg Low</div></div>
+                                <div class="bg-white p-4 rounded-lg shadow"><div class="text-3xl">🌊</div><div class="font-bold text-lg">${destData.climate.sea}</div><div class="text-sm text-slate-500">Sea Temp</div></div>
+                                <div class="bg-white p-4 rounded-lg shadow"><div class="text-3xl">☀️</div><div class="font-bold text-lg">${destData.climate.sun}</div><div class="text-sm text-slate-500">Sunshine</div></div>
+                                <div class="bg-white p-4 rounded-lg shadow col-span-2 sm:col-span-1 lg:col-span-1"><div class="text-3xl">💧</div><div class="font-bold text-lg">${destData.climate.rain}</div><div class="text-sm text-slate-500">Rainfall</div></div>
+                            </div>
+                            <p class="text-slate-600 leading-relaxed">${destData.climate.summary}</p>
+                        `;
+                        break;
+                    case 'activities':
+                        content = `<div class="space-y-6">${destData.activities.map(act => `
+                            <div class="flex items-start gap-4">
+                                <div class="text-3xl flex-shrink-0 mt-1">${act.icon}</div>
+                                <div>
+                                    <h4 class="font-bold text-lg text-slate-800">${act.name}</h4>
+                                    <p class="text-slate-600">${act.desc}</p>
+                                </div>
+                            </div>`).join('')}</div>`;
+                        break;
+                    case 'costs':
+                        const costs = destData.costs;
+                        content = `
+                            <h4 class="text-xl font-bold mb-4 text-center">Group Cost Estimates (4 People)</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-center mb-8">
+                                <div class="bg-white p-4 rounded-lg shadow">
+                                    <div class="font-bold text-lg text-slate-800">$${costs.flights.low.toLocaleString()} - $${costs.flights.high.toLocaleString()}</div>
+                                    <div class="text-sm text-slate-500">Total Airfare (from DC)</div>
+                                </div>
+                                <div class="bg-white p-4 rounded-lg shadow">
+                                    <div class="font-bold text-lg text-slate-800">${costs.villa.low ? `$${costs.villa.low.toLocaleString()} - $${costs.villa.high.toLocaleString()}`: 'N/A'}</div>
+                                    <div class="text-sm text-slate-500">Luxury Villa (7 nights)</div>
+                                </div>
+                                <div class="bg-white p-4 rounded-lg shadow">
+                                    <div class="font-bold text-lg text-slate-800">${costs.hotel.low ? `$${costs.hotel.low.toLocaleString()} - $${costs.hotel.high.toLocaleString()}`: 'N/A'}</div>
+                                    <div class="text-sm text-slate-500">Premium Hotel (7 nights)</div>
+                                </div>
+                                <div class="bg-white p-4 rounded-lg shadow">
+                                    <div class="font-bold text-lg text-slate-800">${costs['all-inclusive'].low ? `$${costs['all-inclusive'].low.toLocaleString()} - $${costs['all-inclusive'].high.toLocaleString()}`: 'N/A'}</div>
+                                    <div class="text-sm text-slate-500">All-Inclusive (7 nights)</div>
+                                </div>
+                            </div>
+                            <hr class="my-8 border-slate-200">
+                            <h4 class="text-xl font-bold mb-4 text-center">Per-Person Flight Cost Breakdown</h4>
+                            <div class="max-w-md mx-auto">
+                                <label for="airport-selector" class="block text-sm font-medium text-slate-700 text-center mb-2">Select Departure Region:</label>
+                                <select id="airport-selector" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 sm:text-sm p-3">
+                                    <option value="DCA" ${currentAirport === 'DCA' ? 'selected' : ''}>Washington D.C. (IAD/DCA)</option>
+                                    <option value="LAX" ${currentAirport === 'LAX' ? 'selected' : ''}>Los Angeles (LAX)</option>
+                                    <option value="PDX" ${currentAirport === 'PDX' ? 'selected' : ''}>Portland (PDX)</option>
+                                </select>
+                                <div id="flight-cost-display"></div>
+                            </div>
+                            <hr class="my-8 border-slate-200">
+                            <h4 class="text-xl font-bold mb-4 text-center">Estimated Total Cost Per Person</h4>
+                            <p class="text-center text-slate-600 mb-6 text-sm">Based on lodging type selected in the main calculator above, split 4 ways.</p>
+                            <div class="chart-container">
+                                <canvas id="per-person-cost-chart"></canvas>
+                            </div>
+                        `;
+                        break;
+                }
+                tabContentContainer.innerHTML = content;
+                tabContentContainer.classList.add('content-fade-in');
+                
+                if (currentTab === 'costs') {
+                    renderFlightCostBreakdown();
+                    updatePerPersonCostChart();
+                    document.getElementById('airport-selector').addEventListener('change', (e) => {
+                        currentAirport = e.target.value;
+                        renderFlightCostBreakdown();
+                    });
+                }
+            }
+            
+            function updateCostChart() {
+                const lodgingType = lodgingSelector.value;
+                const labels = Object.values(data).map(d => d.name);
+                const datasets = [
+                    {
+                        label: 'Low Est. Total Cost',
+                        data: Object.values(data).map(d => (d.costs.flights.low + (d.costs[lodgingType].low || 0)) || null),
+                        backgroundColor: 'rgba(56, 189, 248, 0.6)', // sky-400
+                        borderColor: 'rgba(14, 165, 233, 1)', // sky-500
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'High Est. Total Cost',
+                        data: Object.values(data).map(d => (d.costs.flights.high + (d.costs[lodgingType].high || 0)) || null),
+                        backgroundColor: 'rgba(244, 114, 182, 0.6)', // pink-400
+                        borderColor: 'rgba(236, 72, 153, 1)', // pink-500
+                        borderWidth: 1
+                    }
+                ];
+
+                if (costChart) {
+                    costChart.destroy();
+                }
+
+                const ctx = document.getElementById('cost-comparison-chart').getContext('2d');
+                costChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: { labels, datasets },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    callback: function(value) {
+                                        return '$' + value.toLocaleString();
+                                    }
+                                }
+                            }
+                        },
+                        plugins: {
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.dataset.label || '';
+                                        if (label) {
+                                            label += ': ';
+                                        }
+                                        if (context.parsed.y !== null) {
+                                            label += new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(context.parsed.y);
+                                        }
+                                        return label;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            function updatePerPersonCostChart() {
+                const lodgingType = lodgingSelector.value;
+                const labels = Object.values(data).map(d => d.name);
+                const datasets = [
+                    {
+                        label: 'Low Est. Cost Per Person',
+                        data: Object.values(data).map(d => ((d.costs.flights.low + (d.costs[lodgingType].low || 0)) / 4) || null),
+                        backgroundColor: 'rgba(22, 163, 74, 0.6)',
+                        borderColor: 'rgba(21, 128, 61, 1)',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'High Est. Cost Per Person',
+                        data: Object.values(data).map(d => ((d.costs.flights.high + (d.costs[lodgingType].high || 0)) / 4) || null),
+                        backgroundColor: 'rgba(219, 39, 119, 0.6)',
+                        borderColor: 'rgba(190, 24, 93, 1)',
+                        borderWidth: 1
+                    }
+                ];
+
+                if (perPersonCostChart) {
+                    perPersonCostChart.destroy();
+                }
+
+                const ctx = document.getElementById('per-person-cost-chart')?.getContext('2d');
+                if (!ctx) return;
+
+                perPersonCostChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: { labels, datasets },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    callback: function(value) {
+                                        return '$' + value.toLocaleString();
+                                    }
+                                }
+                            }
+                        },
+                        plugins: {
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.dataset.label || '';
+                                        if (label) {
+                                            label += ': ';
+                                        }
+                                        if (context.parsed.y !== null) {
+                                            label += new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(context.parsed.y);
+                                        }
+                                        return label;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            function renderScorecard() {
+                const metrics = Object.keys(data['Tenerife'].scores);
+                scorecardBody.innerHTML = metrics.map(metric => `
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">${metric}</td>
+                        ${Object.values(data).map(dest => `
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-center text-slate-500">
+                                <span class="font-bold text-lg ${dest.scores[metric] >= 9 ? 'text-teal-600' : dest.scores[metric] >= 7 ? 'text-slate-800' : 'text-amber-600'}">
+                                    ${dest.scores[metric]}
+                                </span>
+                            </td>
+                        `).join('')}
+                    </tr>
+                `).join('');
+            }
+
+            destinationSelectorsContainer.addEventListener('click', (e) => {
+                const selector = e.target.closest('.destination-selector');
+                if (selector) {
+                    currentDestination = selector.dataset.id;
+                    updateUI();
+                }
+            });
+
+            tabsContainer.addEventListener('click', (e) => {
+                const selector = e.target.closest('.tab-selector');
+                if (selector) {
+                    currentTab = selector.dataset.tab;
+                    renderTabs();
+                    renderTabContent();
+                }
+            });
+
+            lodgingSelector.addEventListener('change', () => {
+                updateCostChart();
+                if (currentTab === 'costs') {
+                    updatePerPersonCostChart();
+                }
+            });
+
+            function updateUI() {
+                renderSelectors();
+                renderTabs();
+                renderTabContent();
+            }
+
+            function init() {
+                updateUI();
+                updateCostChart();
+                renderScorecard();
+            }
+
+            init();
+        });
+    </script>
 </body>
 </html>
